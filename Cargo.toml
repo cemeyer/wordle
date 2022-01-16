@@ -10,3 +10,7 @@ name = "wordle"
 path = "main.rs"
 
 [dependencies]
+anyhow = { version = "1.0.51", features = ["backtrace"] }
+itertools = "0.10.3"
+rustc-hash = "1.1.0"
+rustyline = "9.1.2"
