@@ -26,9 +26,25 @@ fn histo(word: &[u8]) -> HashMap<u8, i8> {
     res
 }
 
-fn prune<'a>(answers: &[&'a str], guess: [u8; 5], result: [Color; 5]) -> Vec<&'a str> {
-    answers.iter().filter(|word| {
-        let word = word.as_bytes();
+struct AnswerIterator<'str, 'slice> {
+    answers: &'slice[&'str str],
+    index: usize,
+    guess: [u8; 5],
+    result: [Color; 5],
+}
+
+impl<'str, 'slice> AnswerIterator<'str, 'slice> {
+    fn prune(answers: &'slice[&'str str], guess: [u8; 5], result: [Color; 5]) -> Self {
+        Self {
+            answers, index: 0, guess, result,
+        }
+    }
+
+    #[inline]
+    fn eligible(&self) -> bool {
+        let word = self.answers[self.index].as_bytes();
+        let guess = self.guess;
+        let result = self.result;
 
         let mut hist = histo(word);
 
@@ -71,9 +87,23 @@ fn prune<'a>(answers: &[&'a str], guess: [u8; 5], result: [Color; 5]) -> Vec<&'a
         }
 
         true
-    })
-    .copied()
-    .collect()
+    }
+}
+
+impl<'str, 'slice> Iterator for AnswerIterator<'str, 'slice> {
+    type Item = &'str str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < self.answers.len() {
+            let item = self.answers[self.index];
+            let ok = self.eligible();
+            self.index += 1;
+            if ok {
+                return Some(item);
+            }
+        }
+        None
+    }
 }
 
 fn parse_guess(guess: &str) -> Option<[u8; 5]> {
@@ -109,7 +139,7 @@ fn maybe_prune<'a>(answers: &[&'a str], opt_guess: Option<&str>, opt_result: Opt
     let guess = opt_guess?;
     let result = opt_result?;
 
-    Some(prune(answers, parse_guess(guess)?, parse_result(result)?))
+    Some(AnswerIterator::prune(answers, parse_guess(guess)?, parse_result(result)?).collect())
 }
 
 fn print_rem(answers: &[&str]) {
