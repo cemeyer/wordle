@@ -164,6 +164,10 @@ fn main() -> Result<()> {
             "r" => {
                 answers = ANSW_LIST.to_vec();
             }
+            // print
+            "p" => {
+                println!("{}", answers.join(", "));
+            }
             _ => {
                 println!("No command '{}'", cmd);
             }
