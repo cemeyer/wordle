@@ -92,7 +92,16 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
         (sco, guess)
     }).collect::<Vec<_>>();
 
+    let mut answers_hash = HashSet::<&str>::default();
+    answers_hash.extend(answers);
+
     for (sco, guess) in scored_guesses {
+        // Prioritize guesses that are possible answers.
+        let mut sco = sco * 2;
+        if answers_hash.contains(guess) {
+            sco -= 1;
+        }
+
         if sco < bestsco {
             bestsco = sco;
             bestguess = Some(guess);
