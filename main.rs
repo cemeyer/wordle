@@ -2,7 +2,9 @@
 
 use anyhow::{anyhow, Result};
 use itertools::{Itertools, izip};
+use rayon::prelude::*;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use std::cmp::max;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -24,6 +26,80 @@ fn histo(word: &[u8]) -> HashMap<u8, i8> {
         *res.entry(*w).or_default() += 1;
     }
     res
+}
+
+fn score(answ: &str, guess: &str) -> [Color; 5] {
+    let mut res = [Color::GREY; 5];
+    let mut hist = histo(answ.as_bytes());
+
+    // Set green squares
+    for (i, (a, g)) in answ.as_bytes().iter().zip(guess.as_bytes()).enumerate() {
+        if a == g {
+            res[i] = Color::GREEN;
+            hist.get_mut(a).map(|v| *v -= 1);
+        }
+    }
+
+    // Set yellow squares
+    for (i, (a, g)) in answ.as_bytes().iter().zip(guess.as_bytes()).enumerate() {
+        if a != g {
+            if let Some(v) = hist.get_mut(g) {
+                if *v > 0 {
+                    res[i] = Color::YELLOW;
+                    *v -= 1;
+                }
+            }
+        }
+    }
+
+    res
+}
+
+#[cfg(test)]
+mod test_score {
+    use super::*;
+
+    #[test]
+    fn test_score() {
+        assert_eq!(score("solar", "taser"),
+                   [Color::GREY, Color::YELLOW, Color::YELLOW, Color::GREY, Color::GREEN]);
+        assert_eq!(score("solar", "cling"),
+                   [Color::GREY, Color::YELLOW, Color::GREY, Color::GREY, Color::GREY]);
+    }
+}
+
+fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
+    let mut bestguess: Option<&'a str> = None;
+    let mut bestsco = usize::MAX;
+
+    // Find the guess that, for any remaining answer, minimizes the maximum candidates
+    let scored_guesses = guesses.par_iter().map(|guess| {
+        let mut bguess = [0; 5];
+        for (i, b) in guess.as_bytes().iter().enumerate() {
+            bguess[i] = *b;
+        }
+        //println!("eval: {}", guess);
+
+        let mut sco = 0;
+
+        for answ in answers {
+            let result = score(answ, guess);
+            let numrem = AnswerIterator::prune(answers, bguess, result).count();
+
+            sco = max(sco, numrem);
+        }
+
+        (sco, guess)
+    }).collect::<Vec<_>>();
+
+    for (sco, guess) in scored_guesses {
+        if sco < bestsco {
+            bestsco = sco;
+            bestguess = Some(guess);
+        }
+    }
+
+    println!("Best guess: '{}' with worst case {} candidates", bestguess.unwrap_or(""), bestsco);
 }
 
 struct AnswerIterator<'str, 'slice> {
@@ -197,6 +273,16 @@ fn main() -> Result<()> {
             // print
             "p" => {
                 println!("{}", answers.join(", "));
+            }
+            // best guess
+            "b" => {
+                if answers.len() == ANSW_LIST.len() {
+                    // Precomputed, takes a long time.
+                    println!("Best guess: 'aesir' with worst case 168 candidates");
+                    continue;
+                }
+
+                best_guess(&answers, &guesses);
             }
             _ => {
                 println!("No command '{}'", cmd);
