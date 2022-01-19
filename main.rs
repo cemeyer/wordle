@@ -20,10 +20,19 @@ enum Color {
     GREEN,
 }
 
-fn histo(word: &[u8]) -> HashMap<u8, i8> {
-    let mut res = HashMap::default();
-    for w in word {
-        *res.entry(*w).or_default() += 1;
+type Histogram = [i8; 26];
+
+#[inline]
+fn histo(word: &[u8]) -> Histogram {
+    assert!(word.len() == 5);
+    let mut res = [-1; 26];
+    for i in 0..5 {
+        let w: usize = (word[i] - b'a') as usize;
+        if res[w] > 0 {
+            res[w] += 1;
+        } else {
+            res[w] += 2;
+        }
     }
     res
 }
@@ -32,22 +41,28 @@ fn score(answ: &str, guess: &str) -> [Color; 5] {
     let mut res = [Color::GREY; 5];
     let mut hist = histo(answ.as_bytes());
 
+    let answ = answ.as_bytes();
+    let guess = guess.as_bytes();
+    assert!(answ.len() == 5 && guess.len() == 5);
+
     // Set green squares
-    for (i, (a, g)) in answ.as_bytes().iter().zip(guess.as_bytes()).enumerate() {
+    for i in 0..5 {
+        let a = answ[i];
+        let g = guess[i];
         if a == g {
             res[i] = Color::GREEN;
-            hist.get_mut(a).map(|v| *v -= 1);
+            hist[(a - b'a') as usize] -= 1;
         }
     }
 
     // Set yellow squares
-    for (i, (a, g)) in answ.as_bytes().iter().zip(guess.as_bytes()).enumerate() {
+    for i in 0..5 {
+        let a = answ[i];
+        let g = guess[i];
         if a != g {
-            if let Some(v) = hist.get_mut(g) {
-                if *v > 0 {
-                    res[i] = Color::YELLOW;
-                    *v -= 1;
-                }
+            if hist[(g - b'a') as usize] > 0 {
+                res[i] = Color::YELLOW;
+                hist[(g - b'a') as usize] -= 1;
             }
         }
     }
@@ -74,10 +89,8 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
 
     // Find the guess that, for any remaining answer, minimizes the maximum candidates
     let scored_guesses = guesses.par_iter().map(|guess| {
-        let mut bguess = [0; 5];
-        for (i, b) in guess.as_bytes().iter().enumerate() {
-            bguess[i] = *b;
-        }
+        let guessa = guess.as_bytes();
+        let bguess = [guessa[0], guessa[1], guessa[2], guessa[3], guessa[4]];
         //println!("eval: {}", guess);
 
         let mut sco = 0;
@@ -134,24 +147,34 @@ impl<'str, 'slice> AnswerIterator<'str, 'slice> {
         let mut hist = histo(word);
 
         // First, filter green squares
-        for (w, g, r) in izip!(word, guess, result) {
+        for i in 0..5 {
+            let w = word[i];
+            let g = guess[i];
+            let r = result[i];
             if r == Color::GREEN {
-                if *w != g {
+                if w != g {
                     return false;
                 }
-                hist.get_mut(w).map(|v| *v -= 1);
+                hist[(g - b'a') as usize] -= 1;
             } else if r == Color::YELLOW {
-                hist.get_mut(&g).map(|v| *v -= 1);
+                hist[(g - b'a') as usize] -= 1;
             }
         }
 
         // Filter yellow and grey squares
-        for (w, g, r) in izip!(word, guess, result) {
+        for i in 0..5 {
+            let w = word[i];
+            let g = guess[i];
+            let r = result[i];
             if r == Color::GREEN {
                 continue;
             }
+            // Letter 'w' must not be the yellow or gray letter.
+            if w == g {
+                return false;
+            }
 
-            let g_freq = hist.get(&g).copied().unwrap_or(-1);
+            let g_freq = hist[(g - b'a') as usize];
 
             // If 'word' does not have letter 'g', or else it has fewer 'g's than implied by the
             // number of green or yellow square results for that letter in 'guess', this candidate
@@ -164,11 +187,6 @@ impl<'str, 'slice> AnswerIterator<'str, 'slice> {
             if r == Color::GREY && g_freq > 0 {
                 return false;
             }
-
-            // Letter 'w' must not be the yellow or gray letter.
-            if *w == g {
-                return false;
-            }
         }
 
         true
@@ -178,6 +196,7 @@ impl<'str, 'slice> AnswerIterator<'str, 'slice> {
 impl<'str, 'slice> Iterator for AnswerIterator<'str, 'slice> {
     type Item = &'str str;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         while self.index < self.answers.len() {
             let item = self.answers[self.index];
@@ -287,7 +306,7 @@ fn main() -> Result<()> {
             "b" => {
                 if answers.len() == ANSW_LIST.len() {
                     // Precomputed, takes a long time.
-                    println!("Best guess: 'aesir' with worst case 168 candidates");
+                    println!("Best guess: 'arise' with worst case 168 candidates");
                     continue;
                 }
 
