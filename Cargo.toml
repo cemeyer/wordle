@@ -16,7 +16,8 @@ rayon = "1.5.1"
 rustc-hash = "1.1.0"
 rustyline = "9.1.2"
 
-# Hurts compilation times a lot.
 [profile.release]
+debug = true
+# Hurts compilation times a lot.
 codegen-units=1
 lto="fat"
