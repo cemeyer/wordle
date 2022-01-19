@@ -87,6 +87,8 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
     let mut bestguess: Option<&'a str> = None;
     let mut bestsco = usize::MAX;
 
+    let histos = answers.iter().map(|a| histo(a.as_bytes())).collect::<Vec<_>>();
+
     // Find the guess that, for any remaining answer, minimizes the maximum candidates
     let scored_guesses = guesses.par_iter().map(|guess| {
         let guessa = guess.as_bytes();
@@ -97,7 +99,7 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
 
         for answ in answers {
             let result = score(answ, guess);
-            let numrem = AnswerIterator::prune(answers, bguess, result).count();
+            let numrem = AnswerIterator::prune(answers, &histos, bguess, result).count();
 
             sco = max(sco, numrem);
         }
@@ -126,15 +128,16 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
 
 struct AnswerIterator<'str, 'slice> {
     answers: &'slice[&'str str],
+    histos: &'slice[Histogram],
     index: usize,
     guess: [u8; 5],
     result: [Color; 5],
 }
 
 impl<'str, 'slice> AnswerIterator<'str, 'slice> {
-    fn prune(answers: &'slice[&'str str], guess: [u8; 5], result: [Color; 5]) -> Self {
+    fn prune(answers: &'slice[&'str str], histos: &'slice[Histogram], guess: [u8; 5], result: [Color; 5]) -> Self {
         Self {
-            answers, index: 0, guess, result,
+            answers, histos, index: 0, guess, result,
         }
     }
 
@@ -144,7 +147,9 @@ impl<'str, 'slice> AnswerIterator<'str, 'slice> {
         let guess = self.guess;
         let result = self.result;
 
-        let mut hist = histo(word);
+        let mut hist = self.histos[self.index];
+
+        assert!(word.len() == 5 && guess.len() == 5 && result.len() == 5);
 
         // First, filter green squares
         for i in 0..5 {
@@ -242,8 +247,9 @@ fn parse_result(result: &str) -> Option<[Color; 5]> {
 fn maybe_prune<'a>(answers: &[&'a str], opt_guess: Option<&str>, opt_result: Option<&str>) -> Option<Vec<&'a str>> {
     let guess = opt_guess?;
     let result = opt_result?;
+    let histos = answers.iter().map(|a| histo(a.as_bytes())).collect::<Vec<_>>();
 
-    Some(AnswerIterator::prune(answers, parse_guess(guess)?, parse_result(result)?).collect())
+    Some(AnswerIterator::prune(answers, &histos, parse_guess(guess)?, parse_result(result)?).collect())
 }
 
 fn print_rem(answers: &[&str]) {
