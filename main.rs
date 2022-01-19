@@ -123,7 +123,7 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
         }
     }
 
-    println!("Best guess: '{}' with worst case {} candidates", bestguess.unwrap_or(""), bestsco);
+    println!("Best guess: '{}' with worst case {} candidates", bestguess.unwrap_or(""), (bestsco + 1) / 2);
 }
 
 struct AnswerIterator<'str, 'slice> {
