@@ -83,7 +83,7 @@ mod test_score {
     }
 }
 
-fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
+fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) -> (Option<&'a str>, usize) {
     let mut bestguess: Option<&'a str> = None;
     let mut bestsco = usize::MAX;
 
@@ -122,6 +122,12 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
             bestguess = Some(guess);
         }
     }
+
+    (bestguess, bestsco)
+}
+
+fn print_best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
+    let (bestguess, bestsco) = best_guess(answers, guesses);
 
     println!("Best guess: '{}' with worst case {} candidates", bestguess.unwrap_or(""), (bestsco + 1) / 2);
 }
@@ -212,6 +218,51 @@ impl<'str, 'slice> Iterator for AnswerIterator<'str, 'slice> {
             }
         }
         None
+    }
+}
+
+fn sim_one<'a>(guesses: &[&'a str], answer: &'a str) -> usize {
+    let mut answers = ANSW_LIST.to_vec();
+    let mut nrounds = 0;
+    loop {
+        let guess = if nrounds == 0 {
+            "arise"
+        } else {
+            let (guess, _) = best_guess(&answers, guesses);
+            guess.unwrap()
+        };
+
+        nrounds += 1;
+        if answer == guess {
+            break;
+        }
+        let result = score(answer, guess);
+
+        let histos = answers.iter().map(|a| histo(a.as_bytes())).collect::<Vec<_>>();
+        answers = AnswerIterator::prune(&answers, &histos, parse_guess(guess).unwrap(), result).collect();
+    }
+
+    nrounds
+}
+
+fn fullsim<'a>(guesses: &[&'a str]) {
+    let mut worst = 0;
+    let mut total = 0;
+    let mut hist = HashMap::<_, usize>::default();
+
+    for answ in ANSW_LIST {
+        let rounds = sim_one(guesses, answ);
+        println!("{}: {}", answ, rounds);
+        if rounds > worst {
+            worst = rounds;
+        }
+        *hist.entry(rounds).or_default() += 1;
+        total += rounds;
+    }
+
+    println!("Average {} rounds, worst {} rounds", (total as f64) / (ANSW_LIST.len() as f64), worst);
+    for i in 1..=6 {
+        println!("  {} rounds: {}", i, hist.get(&i).unwrap_or(&0));
     }
 }
 
@@ -316,7 +367,11 @@ fn main() -> Result<()> {
                     continue;
                 }
 
-                best_guess(&answers, &guesses);
+                print_best_guess(&answers, &guesses);
+            }
+            // run full simulation of all words
+            "fs" => {
+                fullsim(&guesses);
             }
             _ => {
                 println!("No command '{}'", cmd);
