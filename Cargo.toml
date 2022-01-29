@@ -11,7 +11,7 @@ path = "lib.rs"
 
 [[bin]]
 name = "wordle"
-path = "main.rs"
+path = "wordle.rs"
 
 [dependencies]
 anyhow = { version = "1.0.51", features = ["backtrace"] }
