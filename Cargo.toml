@@ -13,6 +13,10 @@ path = "lib.rs"
 name = "wordle"
 path = "wordle.rs"
 
+[[bin]]
+name = "dordle"
+path = "dordle.rs"
+
 [dependencies]
 anyhow = { version = "1.0.51", features = ["backtrace"] }
 itertools = "0.10.3"
