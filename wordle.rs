@@ -48,10 +48,11 @@ fn best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) -> (Option<&'a str>,
     (bestguess, bestsco)
 }
 
-fn print_best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) {
+fn print_best_guess<'a>(answers: &[&'a str], guesses: &[&'a str]) -> Option<&'a str> {
     let (bestguess, bestsco) = best_guess(answers, guesses);
 
     println!("Best guess: '{}' with worst case {} candidates", bestguess.unwrap_or(""), (bestsco + 1) / 2);
+    bestguess
 }
 
 fn sim_one<'a>(guesses: &[&'a str], answer: &'a str) -> usize {
@@ -105,6 +106,9 @@ fn main() -> Result<()> {
     guesses.reserve(ANSW_LIST.len());
     guesses.extend_from_slice(ANSW_LIST);
 
+    let mut prev_best_guess = Some("salet");
+    println!("Best guess: 'salet'");
+
     let mut rl = rustyline::Editor::<()>::new();
     // rl.load_history("path.txt").ok();
     // rl.save_history("path.txt").ok();
@@ -126,6 +130,17 @@ fn main() -> Result<()> {
         let mut words = tline.split(' ');
         let cmd = words.next().unwrap();
         match cmd {
+            // guess prev best word result
+            "gb" => {
+                let result = words.next();
+                if let Some(res) = maybe_prune(&answers, prev_best_guess, result) {
+                    answers = res;
+                    prev_best_guess = print_best_guess(&answers, &guesses);
+                    continue;
+                }
+                println!("Usage: gb result");
+                println!("       result is 0 for grey, 1 for yellow, 2 for green");
+            }
             // guess word result
             "g" => {
                 let guess = words.next();
@@ -140,6 +155,7 @@ fn main() -> Result<()> {
             // reset
             "r" => {
                 answers = ANSW_LIST.to_vec();
+                prev_best_guess = Some("salet");
             }
             // print
             "p" => {
